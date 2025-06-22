@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import shutil
 from typing import Dict, Any
-
+from fastapi.staticfiles import StaticFiles
 # 導入同目錄下的自定義模組
 from Drawingfunction import render_video_with_pose_and_max_ball_speed
 from KinematicsModule import extract_pitching_biomechanics
@@ -173,3 +173,5 @@ async def get_history_analyses():
         raise HTTPException(status_code=500, detail=f"無法獲取歷史紀錄: {e}")
     finally:
         db.close()
+
+app.mount("/output_videos",StaticFiles(directory="output_videos"),name="output_videos")

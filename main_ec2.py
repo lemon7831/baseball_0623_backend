@@ -106,6 +106,14 @@ def upload_file_to_s3(file_path: str, bucket: str, object_name: str = None):
         print(f"S3 上傳時發生未知錯誤: {e}")
         raise HTTPException(status_code=500, detail=f"S3 上傳時發生未知錯誤: {e}")
 
+# 新增健康檢查路由
+@app.get("/health")
+async def health_check():
+    """
+    健康檢查路由。
+    返回 200 OK，表示服務正在運行。
+    """
+    return {"status": "ok", "message": "Service is running"}
 
 @app.post("/analyze-pitch/")
 async def analyze_pitch(video_file: UploadFile = File(...)):

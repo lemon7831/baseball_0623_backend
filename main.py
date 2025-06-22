@@ -2,14 +2,10 @@ import os
 import asyncio
 import httpx
 from fastapi import FastAPI, File, UploadFile, HTTPException
-from fastapi.responses import JSONResponse, FileResponse, RedirectResponse # 導入 RedirectResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import shutil
 from typing import Dict, Any
-
-# 導入 boto3
-import boto3
-from botocore.exceptions import ClientError # 用於處理 S3 錯誤
 
 # 導入同目錄下的自定義模組
 from Drawingfunction import render_video_with_pose_and_max_ball_speed
@@ -22,7 +18,7 @@ app = FastAPI()
 # CORS 設置，允許所有來源、方法、標頭，以處理跨域問題
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://baseball-0623-frontend.onrender.com"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -50,62 +46,13 @@ class PitchAnalysis(Base):
     __tablename__ = "pitch_analyses"
 
     id = Column(Integer, primary_key=True, index=True)
-    video_path = Column(String, index=True) # 這個欄位現在會儲存 S3 URL
+    video_path = Column(String, index=True)
     max_speed_kmh = Column(Float)
     pitch_score = Column(Integer)
     biomechanics_features = Column(JSON)
 
 # 創建資料庫表 (如果不存在的話)
 Base.metadata.create_all(bind=engine)
-
-# S3 配置
-# 從環境變數獲取 AWS 憑證和區域
-AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
-AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
-AWS_REGION = os.environ.get("AWS_REGION", "us-east-1") # 替換為你的 AWS 區域，如果環境變數未設置
-S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME", "your-baseball-video-bucket-name") # 替換為你的 S3 Bucket 名稱，如果環境變數未設置
-
-# 初始化 S3 客戶端
-s3_client = None
-if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and AWS_REGION and S3_BUCKET_NAME:
-    try:
-        s3_client = boto3.client(
-            's3',
-            aws_access_key_id=AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-            region_name=AWS_REGION
-        )
-        print("S3 client initialized successfully.")
-    except Exception as e:
-        print(f"Error initializing S3 client: {e}")
-        s3_client = None # 確保 s3_client 為 None 如果初始化失敗
-else:
-    print("WARNING: AWS credentials (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, S3_BUCKET_NAME) not fully configured in environment variables. S3 upload will not work.")
-
-
-# 輔助函數：上傳檔案到 S3
-def upload_file_to_s3(file_path: str, bucket: str, object_name: str = None):
-    """將檔案上傳到 S3 儲存桶"""
-    if s3_client is None:
-        raise Exception("S3 client not initialized. AWS credentials might be missing or incorrect.")
-
-    if object_name is None:
-        object_name = os.path.basename(file_path)
-
-    try:
-        # 使用 upload_file，它會自動處理檔案流
-        s3_client.upload_file(file_path, bucket, object_name)
-        # 構造 S3 公開 URL (假設你的 S3 Bucket 配置為公開讀取)
-        s3_url = f"https://{bucket}.s3.{AWS_REGION}.amazonaws.com/{object_name}"
-        print(f"檔案 {file_path} 已成功上傳到 {s3_url}")
-        return s3_url
-    except ClientError as e:
-        print(f"上傳檔案到 S3 失敗: {e}")
-        raise HTTPException(status_code=500, detail=f"無法上傳影片到雲端儲存: {e}")
-    except Exception as e:
-        print(f"S3 上傳時發生未知錯誤: {e}")
-        raise HTTPException(status_code=500, detail=f"S3 上傳時發生未知錯誤: {e}")
-
 
 @app.post("/analyze-pitch/")
 async def analyze_pitch(video_file: UploadFile = File(...)):
@@ -116,19 +63,12 @@ async def analyze_pitch(video_file: UploadFile = File(...)):
     if not video_file.filename:
         raise HTTPException(status_code=400, detail="未上傳影片檔案")
 
-    # 在 /tmp 目錄下創建臨時檔案，這是 Render 等 PaaS 平台的最佳實踐
-    temp_video_path = os.path.join("/tmp", f"temp_upload_{video_file.filename}")
-    local_output_video_path = os.path.join("/tmp", f"rendered_output_{video_file.filename}")
-
-    # 確保 /tmp 目錄存在，雖然通常 Render 會自動提供
-    os.makedirs(os.path.dirname(temp_video_path), exist_ok=True)
-    os.makedirs(os.path.dirname(local_output_video_path), exist_ok=True) #
-
+    temp_video_path = f"temp_{video_file.filename}"
     try:
         with open(temp_video_path, "wb") as buffer:
             shutil.copyfileobj(video_file.file, buffer)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"無法儲存上傳的影片檔案: {e}")
+        raise HTTPException(status_code=500, detail=f"無法儲存影片檔案: {e}")
 
     try:
         with open(temp_video_path, "rb") as f:
@@ -141,8 +81,9 @@ async def analyze_pitch(video_file: UploadFile = File(...)):
 
     async with httpx.AsyncClient(timeout=300.0) as client:
         try:
-            # 修改點：將 "video_file" 更改為 "file" (根據你之前的指示)
+            # 修改點：將 "video_file" 更改為 "file"
             pose_task = client.post(POSE_API_URL, files={"file": (video_file.filename, video_bytes, "video/mp4")})
+            # 修改點：將 "video_file" 更改為 "file"
             ball_task = client.post(BALL_API_URL, files={"file": (video_file.filename, video_bytes, "video/mp4")})
 
             pose_response, ball_response = await asyncio.gather(pose_task, ball_task)
@@ -161,28 +102,15 @@ async def analyze_pitch(video_file: UploadFile = File(...)):
             raise HTTPException(status_code=500, detail=f"處理外部 API 回應時發生錯誤: {e}")
 
     output_video_filename = f"rendered_{video_file.filename}"
-    # 不再需要 output_videos 資料夾，因為影片將上傳到 S3
-    # local_output_video_path 已經定義為 /tmp 下的路徑
+    output_video_path = os.path.join("output_videos", output_video_filename)
+    os.makedirs(os.path.dirname(output_video_path), exist_ok=True)
 
     rendered_video_path, max_speed_kmh = render_video_with_pose_and_max_ball_speed(
         input_video_path=temp_video_path,
         pose_json=pose_data,
         ball_json=ball_data,
-        output_video_path=local_output_video_path # 渲染到本地臨時路徑
+        output_video_path=output_video_path
     )
-
-    # 將渲染後的影片上傳到 S3
-    s3_video_url = None
-    try:
-        s3_video_url = upload_file_to_s3(local_output_video_path, S3_BUCKET_NAME, output_video_filename)
-    except Exception as e:
-        # 如果 S3 上傳失敗，仍然刪除臨時檔案並報錯
-        if os.path.exists(temp_video_path):
-            os.remove(temp_video_path)
-        if os.path.exists(local_output_video_path):
-            os.remove(local_output_video_path)
-        raise HTTPException(status_code=500, detail=f"影片上傳到 S3 失敗: {e}")
-
 
     biomechanics_features = extract_pitching_biomechanics(pose_data)
     pitch_score = classify_pitch_quality(biomechanics_features)
@@ -191,7 +119,7 @@ async def analyze_pitch(video_file: UploadFile = File(...)):
     new_analysis_id = None
     try:
         new_analysis = PitchAnalysis(
-            video_path=s3_video_url, # 將 S3 URL 儲存到資料庫
+            video_path=rendered_video_path,
             max_speed_kmh=max_speed_kmh,
             pitch_score=pitch_score,
             biomechanics_features=biomechanics_features
@@ -207,43 +135,25 @@ async def analyze_pitch(video_file: UploadFile = File(...)):
     finally:
         db.close()
 
-    # 刪除本地臨時檔案
-    if os.path.exists(temp_video_path):
-        os.remove(temp_video_path)
-    if os.path.exists(local_output_video_path):
-        os.remove(local_output_video_path)
-
+    os.remove(temp_video_path)
 
     return JSONResponse(content={
         "message": "影片分析成功",
-        "output_video_path": s3_video_url, # 返回 S3 URL 給前端
+        "output_video_path": rendered_video_path,
         "max_speed_kmh": round(max_speed_kmh, 2),
         "pitch_score": pitch_score,
         "biomechanics_features": biomechanics_features,
         "new_analysis_id": new_analysis_id
     })
 
-# 修改 get_rendered_video 函數
-# 這個接口現在將直接重定向到 S3 URL。
-# 也可以選擇移除此接口，讓前端直接使用從 /analyze-pitch/ 獲取的 S3 URL 或從 /history/ 獲取的歷史紀錄中的 S3 URL。
-# 如果保留，你可能需要從資料庫中根據 filename 查找對應的 S3 URL。
-# 但由於 filename 並非唯一的 S3 object key，且前端會直接獲取 S3 URL，這個接口的最佳實踐是根據 analysis_id 來查找。
-# 目前的實現會假設 filename 就是 S3 object name，並直接構造 URL。
 @app.get("/output_videos/{filename}")
 async def get_rendered_video(filename: str):
-    # 這個接口的存在主要是為了兼容之前可能的前端調用方式
-    # 在實際應用中，如果前端已經直接從 /analyze-pitch/ 或 /history/ 獲取了 S3 URL
-    # 這個接口的使用頻率會大大降低，甚至可以移除。
-    # 如果你希望通過這個接口來獲取歷史影片，你需要根據 filename 從資料庫中查找對應的 S3 URL。
-    # 這裡只是一個示例，它假設 filename 可以直接用來構造 S3 URL。
-    if not (AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and AWS_REGION and S3_BUCKET_NAME):
-        raise HTTPException(status_code=500, detail="S3 配置不完整，無法獲取影片。")
+    file_path = os.path.join("output_videos", filename)
+    if os.path.exists(file_path):
+        return FileResponse(file_path, media_type="video/mp4")
+    else:
+        raise HTTPException(status_code=404, detail="影片未找到")
 
-    s3_url = f"https://{S3_BUCKET_NAME}.s3.{AWS_REGION}.amazonaws.com/{filename}"
-    return RedirectResponse(url=s3_url, status_code=302)
-
-
-# 修改 get_history_analyses 函數
 @app.get("/history/")
 async def get_history_analyses():
     db = SessionLocal()
@@ -252,7 +162,7 @@ async def get_history_analyses():
         return [
             {
                 "id": record.id,
-                "video_path": record.video_path, # 這裡已經是 S3 URL
+                "video_path": record.video_path,
                 "max_speed_kmh": record.max_speed_kmh,
                 "pitch_score": record.pitch_score,
                 "biomechanics_features": record.biomechanics_features

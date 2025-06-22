@@ -8,3 +8,4 @@ SQLAlchemy==2.0.41
 uvicorn
 psycopg2
 python-multipart
+boto3

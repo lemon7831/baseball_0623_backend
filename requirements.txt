@@ -1,6 +1,6 @@
 fastapi==0.115.13
 httpx==0.28.1
-numpy==2.3.1
+numpy
 opencv_contrib_python==4.11.0.86
 opencv_python==4.11.0.86
 opencv_python_headless==4.11.0.86

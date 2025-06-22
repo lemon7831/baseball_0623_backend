@@ -22,7 +22,7 @@ app = FastAPI()
 # CORS 設置，允許所有來源、方法、標頭，以處理跨域問題
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://baseball-0623-frontend.onrender.com"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -1,0 +1,11 @@
+{
+    "avg_elbow_angle": 92.58793591502477,
+    "avg_shoulder_slope_deg": 120.12941456352631,
+    "avg_hip_slope_deg": 89.71035567571921,
+    "avg_torso_twist_deg": 75.26191728137613,
+    "max_hand_speed_px_per_s": 6391.980529190925,
+    "max_stride_length_px": 127.13555908203125,
+    "min_elbow_height_px": 155.1768035888672,
+    "avg_head_elbow_dist_px": 82.3579219439491,
+    "avg_shoulder_width_px": 20.467446976349134
+}

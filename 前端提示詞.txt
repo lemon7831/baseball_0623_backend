@@ -1,0 +1,72 @@
+
+# 提示詞
+我有一個棒球投手分析儀表板專案
+目前只寫好fastapi後端有三個路由
+路由1
+@app.post("/analyze-pitch/")
+return JSONResponse(content={
+        "message": "影片分析成功",
+        "output_video_path": rendered_video_path,#.mp4檔案影片路徑
+        "max_speed_kmh": round(max_speed_kmh, 2),# 最大球速 130到170
+        "pitch_score": pitch_score,# 投球分數 1到9分
+        "biomechanics_features": biomechanics_features,#一個字典詳細數據在下面
+        "new_analysis_id": new_analysis_id#給一個id記錄用
+    })
+其中biomechanics_features格式範例
+{   # 各種關鍵出手畫面
+    "release_frame": 180,#出手偵
+    "landing_frame": 171,#踏步偵
+    "shoulder_frame": 171,#肩膀偵
+    "total_frames": 238,#影片總偵數
+    # 各種運動力學特徵(6個)
+    "Trunk_flexion_excursion": 62.664459228515625,
+    "Pelvis_obliquity_at_FC": -1.271087646484375,
+    "Trunk_rotation_at_BR": 159.1455433901004,
+    "Shoulder_abduction_at_BR": 149.90486392757566,
+    "Trunk_flexion_at_BR": -66.2974853515625,
+    "Trunk_lateral_flexion_at_HS": -0.775177001953125
+}
+路由2
+@app.get("/output_videos/{filename}")
+return FileResponse(file_path, media_type="video/mp4")#影片路徑讓前端可以看到渲染上骨架圖和棒球偵測框的影片
+路由3
+@app.get("/history/")
+return [
+            {
+                "id": record.id,#紀錄id
+                "video_path": record.video_path,#影片路徑
+                "max_speed_kmh": record.max_speed_kmh,#最大球速
+                "pitch_score": record.pitch_score,#投手分數
+                "biomechanics_features": record.biomechanics_features#biomechanics_features
+            }
+            for record in history_records#所有的歷史紀錄
+基於這些api路由和回傳資料開發一個"棒球投手分析儀表板"
+前端基於 html jQuery Tailwind CSS 
+我的後端 url 是 https://1881-43-207-222-55.ngrok-free.app
+首頁分"上下兩排一共五個區塊" "上二下三整齊排放" 
+上排有兩個區塊"(影片上傳區)|(影片播放區)" 
+下排有三個區塊"(姿勢評分與運動力學特徵)(模型預測結果)(歷史紀錄)"
+邏輯是前端經由影片上傳區接@app.post("/analyze-pitch/")丟mp4影片過來等待後端分析
+之後經過後端分析處理一陣子後端處理完回傳渲染過的影片到前端"影片播放區"
+播放路由(@app.get("/output_videos/{filename}"))
+同時用回傳的"多項運動力學特徵"更新"姿勢評分與運動力學特徵區塊",
+用"最大球速"和"投球分數"用來更新"模型預測結果區塊"
+用@app.get("/history/")更新"歷史紀錄區塊"
+然後歷史紀錄區塊有個小按鈕"查看歷史紀錄分析"
+點進去之後會導航到"棒球歷史紀錄分析統計圖表頁面"
+裡面可以讓使用者選擇想觀察的歷史紀錄然後根據已有數據渲染出各種"酷炫的統計圖表"
+包括但不限於 
+"投球分數分佈直方圖" 
+"各種運動力學特徵分布的圓餅圖(選單式讓user選自己想看的)"
+"運動力學特徵雷達圖" 
+以及所有基於我回傳的資料能做的統計圖表 你都可以設計
+記得前端基於 html jQuery Tailwind CSS 模組化設計 程式碼盡量清晰好讀
+一些你可能會有的疑問
+1.影片上傳方式 <input type="file" id="video-upload" accept="video/*" class="hidden"> 
+2.分析過程中的使用者回饋 旋轉的loading圖示
+3.錯誤處理與提示 將後端錯誤照實回傳
+4.生物力學特徵的顯示 簡單的列表顯示所有鍵值對 各種運動力學特徵(6個)記得翻譯成中文
+5.歷史紀錄顯示細節 滾動加載
+6.統計圖表頁面 - 資料選擇方式 提供一個下拉選單讓使用者選擇單一紀錄
+7.圖表庫的選擇 選擇一個適合的
+8.頁面間導航 SPA

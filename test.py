@@ -12,6 +12,15 @@ with open("CH_videos_4s_pitch_0001_skeleton.json", "r") as f:
 result_v1 = extract_v1(skeleton_data)
 result_v2 = extract_v2(skeleton_data)
 
+# 儲存分析結果為 JSON 檔案
+with open("pitch_0001_features_v1.json", "w") as f1:
+    json.dump(result_v1, f1, indent=4)
+
+with open("pitch_0001_features_v2.json", "w") as f2:
+    json.dump(result_v2, f2, indent=4)
+
+print("已成功儲存 result_v1 和 result_v2 到 JSON 檔案。")
+
 # 顯示比對結果
 print("\n===== V1 Biomechanics Features =====")
 for k, v in result_v1.items():

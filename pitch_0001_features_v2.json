@@ -1,0 +1,12 @@
+{
+    "release_frame": 180,
+    "landing_frame": 171,
+    "shoulder_frame": 171,
+    "total_frames": 238,
+    "Trunk_flexion_excursion": 62.664459228515625,
+    "Pelvis_obliquity_at_FC": -1.271087646484375,
+    "Trunk_rotation_at_BR": 159.1455433901004,
+    "Shoulder_abduction_at_BR": 149.90486392757566,
+    "Trunk_flexion_at_BR": -66.2974853515625,
+    "Trunk_lateral_flexion_at_HS": -0.775177001953125
+}

@@ -9,8 +9,8 @@ from typing import Dict, Any
 from fastapi.staticfiles import StaticFiles
 # 導入同目錄下的自定義模組
 from Drawingfunction import render_video_with_pose_and_max_ball_speed
-from KinematicsModule import extract_pitching_biomechanics
-from ClassificationModel import classify_pitch_quality
+from KinematicsModulev2 import extract_pitching_biomechanics
+from ClassificationModelv2 import classify_pitch_quality
 
 # FastAPI 應用實例
 app = FastAPI()
@@ -29,7 +29,7 @@ POSE_API_URL = "https://mmpose-api-924124779607.us-central1.run.app/pose_video"
 BALL_API_URL = "https://baseball-api-gpu-669140972615.us-central1.run.app/predict-video"
 
 # Render PostgreSQL 資料庫 URL
-DATABASE_URL = "postgresql://baseball_database_1761_user:KuHDnfORZhnrd8LJlvomxARTPB3ekC93@dpg-d1but1gdl3ps73f3418g-a.oregon-postgres.render.com/baseball_database_1761"
+DATABASE_URL = "postgresql://baseball_0623_postgres_user:5EcgbNjxL90WgsAWGU5xNylqYoEvNBWx@dpg-d1d1nrmmcj7s73fai6k0-a.oregon-postgres.render.com/baseball_0623_postgres"
 
 # SQLAlchemy 設定
 from sqlalchemy import create_engine, Column, Integer, String, Float, JSON

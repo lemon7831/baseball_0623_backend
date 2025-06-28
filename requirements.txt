@@ -7,4 +7,4 @@ SQLAlchemy==2.0.41
 psycopg2
 pandas
 uvicorn
-
+joblib

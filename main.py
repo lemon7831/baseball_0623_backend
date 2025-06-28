@@ -8,7 +8,7 @@ import shutil
 from typing import Dict, Any
 from fastapi.staticfiles import StaticFiles
 import logging
-
+import uvicorn
 # 導入同目錄下的自定義模組
 from Drawingfunction import render_video_with_pose_and_max_ball_speed
 from KinematicsModulev2 import extract_pitching_biomechanics

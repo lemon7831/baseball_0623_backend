@@ -15,8 +15,8 @@ COPY . /app
 RUN pip install --upgrade pip \
     && pip install -r requirements.txt
 
-# 對外開放 8000 port
-EXPOSE 8000
+# 對外開放 8080 port
+EXPOSE 8080
 
 # 啟動 FastAPI 伺服器
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]

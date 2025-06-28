@@ -6,3 +6,4 @@ opencv_python==4.11.0.86
 SQLAlchemy==2.0.41
 psycopg2
 uvicorn
+pandas

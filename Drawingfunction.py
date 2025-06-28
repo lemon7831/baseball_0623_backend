@@ -45,10 +45,7 @@ def render_video_with_pose_and_max_ball_speed(input_video_path: str,
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = cap.get(cv2.CAP_PROP_FPS)
-    #fourcc = cv2.VideoWriter_fourcc(*'mp4v') # <-- 改回這一行
     fourcc = cv2.VideoWriter_fourcc(*'X264') # <-- 修改這一行
-    #fourcc = cv2.VideoWriter_fourcc(*'MJPG')  # ✅ 高相容性，支援 .mp4
-    #fourcc = cv2.VideoWriter_fourcc(*'XVID')
     out = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
     
     # 確保 pose_frames 和 ball_frames 被正確初始化

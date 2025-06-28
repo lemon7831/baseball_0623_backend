@@ -62,7 +62,7 @@ class PitchAnalysis(Base):
     max_speed_kmh = Column(Float)
     pitch_score = Column(Integer)
     biomechanics_features = Column(JSON)
-    ball_classification = Column(Float)
+    ball_score = Column(Float)
 
 # 創建資料庫表 (如果不存在的話)
 Base.metadata.create_all(bind=engine)
@@ -143,7 +143,7 @@ async def analyze_pitch(video_file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"運動學分析或投球評分失敗: {e}")
 
     try:
-        ball_classification = classify_ball_quality(ball_data, ball_prediction_model)
+        ball_score = classify_ball_quality(ball_data, ball_prediction_model)
     except Exception as e:
         logger.error(f"球路分類失敗: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"球路分類失敗: {e}")
@@ -156,7 +156,7 @@ async def analyze_pitch(video_file: UploadFile = File(...)):
             max_speed_kmh=max_speed_kmh,
             pitch_score=pitch_score,
             biomechanics_features=biomechanics_features,
-            ball_classification=ball_classification
+            ball_score=ball_score
         )
         db.add(new_analysis)
         db.commit()
@@ -180,7 +180,7 @@ async def analyze_pitch(video_file: UploadFile = File(...)):
         "output_video_path": rendered_video_path,
         "max_speed_kmh": round(max_speed_kmh, 2),
         "pitch_score": pitch_score,
-        "ball_classification": ball_classification,
+        "ball_score": ball_score,
         "biomechanics_features": biomechanics_features,
         "new_analysis_id": new_analysis_id
     })
@@ -205,7 +205,7 @@ async def get_history_analyses():
                 "video_path": record.video_path,
                 "max_speed_kmh": record.max_speed_kmh,
                 "pitch_score": record.pitch_score,
-                "ball_classification": record.ball_classification,
+                "ball_score": record.ball_score,
                 "biomechanics_features": record.biomechanics_features
             }
             for record in history_records
@@ -216,4 +216,5 @@ async def get_history_analyses():
     finally:
         db.close()
 
+os.makedirs("output_videos", exist_ok=True)
 app.mount("/output_videos", StaticFiles(directory="output_videos"), name="output_videos")

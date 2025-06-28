@@ -218,3 +218,7 @@ async def get_history_analyses():
 
 os.makedirs("output_videos", exist_ok=True)
 app.mount("/output_videos", StaticFiles(directory="output_videos"), name="output_videos")
+if __name__ == "__main__":
+    import uvicorn
+    print("🚀 FastAPI 正在啟動...")
+    uvicorn.run("main:app", host="0.0.0.0", port=8080)

@@ -1,9 +1,10 @@
 FROM python:3.9
 
-# 確保必要套件齊全（雖然 full image 通常已經內建）
+# 確保必要套件齊全，並添加 ffmpeg
 RUN apt-get update && apt-get install -y \
     libpq-dev \
     libgl1 \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # 設定工作目錄

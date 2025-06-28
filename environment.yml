@@ -14,4 +14,4 @@ dependencies:
   - joblib
   - scikit-learn
   - python-multipart
-  - opencv-python
+  - opencv

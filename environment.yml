@@ -1,0 +1,17 @@
+name: my_app_env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9  # 建議指定一個 Python 版本，例如 3.9 或 3.10，以確保穩定性
+  - fastapi=0.115.13
+  - httpx=0.28.1
+  - numpy
+  - sqlalchemy=2.0.41 # SQLAlchemy 在 Conda Forge 中通常寫作小寫
+  - psycopg2
+  - pandas
+  - uvicorn
+  - joblib
+  - scikit-learn
+  - python-multipart
+  - opencv-python

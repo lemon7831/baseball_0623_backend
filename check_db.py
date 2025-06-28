@@ -33,7 +33,7 @@ def main():
             print(f"\n資料表 {table_to_query} 的前5筆資料：")
 
             # 用 pandas 讀取查詢結果
-            query = sql.SQL("SELECT * FROM {} LIMIT 5").format(sql.Identifier(table_to_query))
+            query = sql.SQL("SELECT * FROM {} LIMIT 100").format(sql.Identifier(table_to_query))
             df = pd.read_sql_query(query.as_string(conn), conn)
             print(df)
         else:

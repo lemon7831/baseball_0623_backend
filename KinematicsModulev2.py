@@ -164,9 +164,11 @@ def load_pose_from_response(result_json):
     for frame in result_json["frames"]:
         if not frame["predictions"]:
             continue
-
-        keypoints = np.array(frame["predictions"][0][0]["keypoints"])  # shape: (17, 2 or 3)
-
+        try:    
+            keypoints = np.array(frame["predictions"][0][0]["keypoints"])  # shape: (17, 2 or 3)
+        except:
+            keypoints = np.array(frame["predictions"][0]["keypoints"])  # shape: (17, 2 or 3)
+            
         if keypoints.shape[1] == 2:
             conf = np.ones((17, 1), dtype=np.float32)
             keypoints = np.concatenate([keypoints, conf], axis=-1)

@@ -25,8 +25,8 @@ app.add_middleware(
 )
 
 # 外部 API 端點
-POSE_API_URL = "https://mmpose-api-924124779607.us-central1.run.app/pose_video"
-BALL_API_URL = "https://baseball-api-gpu-669140972615.us-central1.run.app/predict-video"
+POSE_API_URL = "https://mmpose-api-1069614647348.us-central1.run.app/pose_video"
+BALL_API_URL = "https://base-ball-detect-api-1069614647348.us-central1.run.app/predict"
 
 # Render PostgreSQL 資料庫 URL
 DATABASE_URL = "postgresql://baseball_0623_postgres_user:5EcgbNjxL90WgsAWGU5xNylqYoEvNBWx@dpg-d1d1nrmmcj7s73fai6k0-a.oregon-postgres.render.com/baseball_0623_postgres"

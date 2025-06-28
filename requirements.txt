@@ -1,8 +1,6 @@
 fastapi==0.115.13
 httpx==0.28.1
 numpy
-opencv_contrib_python==4.11.0.86
-opencv_python==4.11.0.86
 SQLAlchemy==2.0.41
 psycopg2
 pandas

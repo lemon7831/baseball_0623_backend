@@ -94,38 +94,27 @@ def render_video_with_pose_and_max_ball_speed(input_video_path: str,
             # 確保 current_ball_box 不是 None 才能進行 map(int, ...)
             if current_ball_box is not None:
                 x1, y1, x2, y2 = map(int, current_ball_box)
-                w = x2 - x1
-                h = y2 - y1
+                cx = (x1 + x2) // 2
+                cy = (y1 + y2) // 2
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+                cv2.putText(frame, "Baseball", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
 
-                # 檢查寬高是否大於0，避免除以零的錯誤
-                if w > 0 and h > 0:
-                    aspect_ratio = w / h
-                    area = w * h
-                    
-                    # 新增過濾條件：長寬比和面積大小，過濾掉不太可能是棒球的框
-                    # 這些值可能需要根據實際情況微調
-                    if 0.6 <= aspect_ratio <= 1.5 and 10 < area < (width * height * 0.03):      
-                        cx = (x1 + x2) // 2
-                        cy = (y1 + y2) // 2
-                        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
-                        cv2.putText(frame, "Baseball", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+                if prev_center is not None and prev_frame_idx is not None:
+                    dx = cx - prev_center[0]
+                    dy = cy - prev_center[1]
+                    distance_pixels = math.sqrt(dx**2 + dy**2)
+                    dt = (frame_idx - prev_frame_idx) / fps
 
-                        if prev_center is not None and prev_frame_idx is not None:
-                            dx = cx - prev_center[0]
-                            dy = cy - prev_center[1]
-                            distance_pixels = math.sqrt(dx**2 + dy**2)
-                            dt = (frame_idx - prev_frame_idx) / fps
+                    if dt > 0:
+                        distance_m = distance_pixels * pixel_to_meter
+                        speed_mps = distance_m / dt
+                        speed_kmh = speed_mps * 3.6
 
-                            if dt > 0:
-                                distance_m = distance_pixels * pixel_to_meter
-                                speed_mps = distance_m / dt
-                                speed_kmh = speed_mps * 3.6
+                        if min_valid_speed_kmh <= speed_kmh <= max_valid_speed_kmh:
+                            max_speed_kmh = max(max_speed_kmh, speed_kmh)
 
-                                if min_valid_speed_kmh <= speed_kmh <= max_valid_speed_kmh:
-                                    max_speed_kmh = max(max_speed_kmh, speed_kmh)
-
-                        prev_center = (cx, cy)
-                        prev_frame_idx = frame_idx
+                prev_center = (cx, cy)
+                prev_frame_idx = frame_idx
             # 如果 current_ball_box 是 None，則跳過棒球框繪製和速度計算
 
         # --- 畫最大球速 ---

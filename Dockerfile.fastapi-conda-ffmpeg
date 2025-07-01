@@ -1,0 +1,32 @@
+# 使用基於 Debian 的 miniconda 映像，以便可以使用 conda
+FROM continuumio/miniconda3:latest
+
+# 確保必要套件齊全，並添加 ffmpeg、libgl1 與 ubuntu-restricted-extras
+RUN apt-get update && \
+    apt-get install -y software-properties-common && \
+    echo debconf shared/accepted-mscorefonts-eula select true | debconf-set-selections && \
+    echo debconf shared/accepted-mscorefonts-eula seen true | debconf-set-selections && \
+    apt-get install -y \
+    libgl1 \
+    ffmpeg \
+    ubuntu-restricted-extras \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# 設定工作目錄
+WORKDIR /app
+
+# 複製 Conda 環境檔案到容器中
+COPY environment.yml /app/environment.yml
+
+# 創建 Conda 環境並安裝所有套件
+RUN conda env create -f environment.yml
+
+# 複製所有應用程式檔案到容器中
+COPY . /app
+
+# 對外開放 8080 port
+EXPOSE 8080
+
+# 啟動 FastAPI 伺服器
+CMD ["conda", "run", "-n", "my_app_env", "python", "main.py"]

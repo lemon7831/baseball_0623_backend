@@ -1,35 +1,36 @@
 # 使用基於 Debian 的 miniconda 映像，以便可以使用 conda
 FROM continuumio/miniconda3:latest
 
-# 確保必要套件齊全，並添加 ffmpeg、libgl1 與基本字型與 codec 支援
+# 安裝系統層級依賴套件：OpenCV 支援、音視頻解碼、字體等
 RUN apt-get update && \
     apt-get install -y software-properties-common && \
-    echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" | debconf-set-selections && \
     apt-get install -y \
     libgl1 \
     ffmpeg \
+    fonts-dejavu \
     xfonts-utils \
     gstreamer1.0-libav \
     gstreamer1.0-plugins-ugly \
     gstreamer1.0-plugins-bad \
     gstreamer1.0-plugins-good \
-    gstreamer1.0-plugins-base \
-    && rm -rf /var/lib/apt/lists/* && apt-get clean
+    gstreamer1.0-plugins-base && \
+    rm -rf /var/lib/apt/lists/* && \
+    apt-get clean
 
 # 設定工作目錄
 WORKDIR /app
 
-# 複製 Conda 環境檔案到容器中
+# 複製 Conda 環境設定檔進容器
 COPY environment.yml /app/environment.yml
 
-# 創建 Conda 環境並安裝所有套件
+# 使用 Conda 建立環境
 RUN conda env create -f environment.yml
 
-# 複製所有應用程式檔案到容器中
+# 將整個應用程式複製進容器
 COPY . /app
 
 # 對外開放 8080 port
 EXPOSE 8080
 
-# 啟動 FastAPI 伺服器
+# 使用 conda 執行指定環境下的主程式（請將 my_app_env 改成 environment.yml 裡的 name）
 CMD ["conda", "run", "-n", "my_app_env", "python", "main.py"]

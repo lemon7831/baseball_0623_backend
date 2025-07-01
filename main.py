@@ -14,7 +14,12 @@ from Drawingfunction import render_video_with_pose_and_max_ball_speed
 from KinematicsModulev2 import extract_pitching_biomechanics
 from ClassificationModelv2 import classify_pitch_quality
 from BallClassification import classify_ball_quality
+from gcs_utils import upload_video_to_gcs  # 導入 GCS 上傳函式
 import joblib
+
+# GCS 設定
+GCS_BUCKET_NAME = "baseball_cloud_storage"
+
 
 # 設定 logging
 logging.basicConfig(
@@ -120,39 +125,58 @@ async def analyze_pitch(video_file: UploadFile = File(...)):
             logger.error(f"處理外部 API 回應時發生錯誤: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"處理外部 API 回應時發生錯誤: {e}")
 
-    output_video_filename = f"rendered_{video_file.filename}"
-    output_video_path = os.path.join("output_videos", output_video_filename)
-    os.makedirs(os.path.dirname(output_video_path), exist_ok=True)
-
+    # 4. 渲染影片
     try:
-        rendered_video_path, max_speed_kmh = render_video_with_pose_and_max_ball_speed(
+        rendered_video_local_path, max_speed_kmh = render_video_with_pose_and_max_ball_speed(
             input_video_path=temp_video_path,
             pose_json=pose_data,
-            ball_json=ball_data,
-            output_video_path=output_video_path
+            ball_json=ball_data
         )
     except Exception as e:
         logger.error(f"影片渲染失敗: {e}", exc_info=True)
+        # 清理臨時檔案
+        if os.path.exists(temp_video_path):
+            os.remove(temp_video_path)
         raise HTTPException(status_code=500, detail=f"影片渲染失敗: {e}")
 
+    # 5. 上傳至 GCS
+    gcs_video_url = None
+    try:
+        destination_blob_name = f"render_videos/rendered_{video_file.filename}"
+        gcs_video_url = upload_video_to_gcs(
+            bucket_name=GCS_BUCKET_NAME,
+            source_file_path=rendered_video_local_path,
+            destination_blob_name=destination_blob_name
+        )
+    except Exception as e:
+        logger.error(f"GCS 上傳失敗: {e}", exc_info=True)
+        # 清理臨時檔案
+        if os.path.exists(temp_video_path):
+            os.remove(temp_video_path)
+        if os.path.exists(rendered_video_local_path):
+            os.remove(rendered_video_local_path)
+        raise HTTPException(status_code=500, detail=f"GCS 上傳失敗: {e}")
+
+    # 6. 運動學分析與評分
     try:
         biomechanics_features = extract_pitching_biomechanics(pose_data)
         pitch_score = classify_pitch_quality(biomechanics_features)
-    except Exception as e:
-        logger.error(f"運動學分析或投球評分失敗: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"運動學分析或投球評分失敗: {e}")
-
-    try:
         ball_score = classify_ball_quality(ball_data, ball_prediction_model)
     except Exception as e:
-        logger.error(f"球路分類失敗: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"球路分類失敗: {e}")
+        logger.error(f"分析或評分失敗: {e}", exc_info=True)
+        # 清理臨時檔案
+        if os.path.exists(temp_video_path):
+            os.remove(temp_video_path)
+        if os.path.exists(rendered_video_local_path):
+            os.remove(rendered_video_local_path)
+        raise HTTPException(status_code=500, detail=f"分析或評分失敗: {e}")
 
+    # 7. 儲存至資料庫
     db = SessionLocal()
     new_analysis_id = None
     try:
         new_analysis = PitchAnalysis(
-            video_path=rendered_video_path,
+            video_path=gcs_video_url,  # 儲存 GCS URL
             max_speed_kmh=max_speed_kmh,
             pitch_score=pitch_score,
             biomechanics_features=biomechanics_features,
@@ -170,14 +194,19 @@ async def analyze_pitch(video_file: UploadFile = File(...)):
     finally:
         db.close()
 
+    # 8. 清理本地臨時檔案
     try:
-        os.remove(temp_video_path)
+        if os.path.exists(temp_video_path):
+            os.remove(temp_video_path)
+        if os.path.exists(rendered_video_local_path):
+            os.remove(rendered_video_local_path)
     except Exception as e:
         logger.warning(f"刪除暫存影片失敗: {e}", exc_info=True)
 
+    # 9. 回傳結果
     return JSONResponse(content={
         "message": "影片分析成功",
-        "output_video_path": rendered_video_path,
+        "output_video_url": gcs_video_url,  # 回傳 GCS URL
         "max_speed_kmh": round(max_speed_kmh, 2),
         "pitch_score": pitch_score,
         "ball_score": ball_score,
@@ -185,14 +214,7 @@ async def analyze_pitch(video_file: UploadFile = File(...)):
         "new_analysis_id": new_analysis_id
     })
 
-@app.get("/output_videos/{filename}")
-async def get_rendered_video(filename: str):
-    file_path = os.path.join("output_videos", filename)
-    if os.path.exists(file_path):
-        return FileResponse(file_path, media_type="video/mp4")
-    else:
-        logger.error(f"影片未找到: {filename}")
-        raise HTTPException(status_code=404, detail="影片未找到")
+
 
 @app.get("/history/")
 async def get_history_analyses():
@@ -216,8 +238,7 @@ async def get_history_analyses():
     finally:
         db.close()
 
-os.makedirs("output_videos", exist_ok=True)
-app.mount("/output_videos", StaticFiles(directory="output_videos"), name="output_videos")
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     uvicorn.run("main:app", host="0.0.0.0", port=port)

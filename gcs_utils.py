@@ -19,12 +19,3 @@ def upload_video_to_gcs(bucket_name, source_file_path, destination_blob_name):
     print(f"公開網址：{public_url}")
     return public_url
 
-upload_video_to_gcs(
-    bucket_name="baseball_cloud_storage",
-    source_file_path="pitch_0002.mp4",
-    destination_blob_name="videos/my_video.mp4"
-)
-
-
-修改main.py和Drawingfunction.py 我不打算把渲染後的影片放在本地端"output_videos"資料夾我打算放在 GCS 
-作法你可以參考GCS_test.py這個檔案 destination_blob_name設置為 render_videos/render_{filename}.mp4

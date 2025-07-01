@@ -17,26 +17,15 @@ COCO_CONNECTIONS = [
 def render_video_with_pose_and_max_ball_speed(input_video_path: str,
                                               pose_json: dict,
                                               ball_json: dict,
-                                              output_video_path: str,
                                               pixel_to_meter: float = 0.04,
                                               min_valid_speed_kmh: float = 30,
                                               max_valid_speed_kmh: float = 200) -> Tuple[str, float]:
-    """
-    同時渲染骨架與棒球框，顯示最大球速，並排除不合理速度。
+    # Define a temporary directory for rendered videos
+    output_dir = "temp_rendered_videos"
+    os.makedirs(output_dir, exist_ok=True) # Ensure this directory exists
 
-    Args:
-        input_video_path (str): 原始影片路徑
-        pose_json (dict): 骨架偵測資料
-        ball_json (dict): 棒球框資料
-        output_video_path (str): 輸出影片路徑
-        pixel_to_meter (float): 像素轉公尺的比例（例如18.44m/450px ≈ 0.04）
-        min_valid_speed_kmh (float): 最小有效速度
-        max_valid_speed_kmh (float): 最大有效速度
-
-    Returns:
-        tuple[str, float]: 輸出影片路徑 和 最大球速
-    """
-    os.makedirs(os.path.dirname(output_video_path), exist_ok=True)
+    # Construct the output video path within the temporary directory
+    output_video_path = os.path.join(output_dir, f"temp_rendered_{os.path.basename(input_video_path)}")
 
     cap = cv2.VideoCapture(input_video_path)
     if not cap.isOpened():

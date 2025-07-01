@@ -9,7 +9,6 @@ RUN apt-get update && \
     libgl1 \
     ffmpeg \
     xfonts-utils \
-    ttf-mscorefonts-installer \
     gstreamer1.0-libav \
     gstreamer1.0-plugins-ugly \
     gstreamer1.0-plugins-bad \

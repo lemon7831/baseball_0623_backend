@@ -2,7 +2,7 @@ from google.cloud import storage
 
 def upload_video_to_gcs(bucket_name, source_file_path, destination_blob_name):
     # 初始化 GCS 客戶端
-    client = storage.Client.from_service_account_json("service-account-key.json")
+    client = storage.Client()
     bucket = client.bucket(bucket_name)
     blob = bucket.blob(destination_blob_name)
 

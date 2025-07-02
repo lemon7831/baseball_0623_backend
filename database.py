@@ -20,6 +20,9 @@ class PitchAnalysis(Base):
     pitch_score = Column(Integer)
     biomechanics_features = Column(JSON)
     ball_score = Column(Float)
+    release_frame_url = Column(String, nullable=True)
+    landing_frame_url = Column(String, nullable=True)
+    shoulder_frame_url = Column(String, nullable=True)
 
 # 創建資料庫表 (如果不存在的話)
 Base.metadata.create_all(bind=engine)

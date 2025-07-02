@@ -11,14 +11,17 @@ def get_pitch_analyses(db: Session, pitcher_name: str = None):
         query = query.filter(PitchAnalysis.pitcher_name == pitcher_name)
     return query.all()
 
-def create_pitch_analysis(db: Session, video_path: str, pitcher_name: str, max_speed_kmh: float, pitch_score: int, biomechanics_features: dict, ball_score: float):
+def create_pitch_analysis(db: Session, video_path: str, pitcher_name: str, max_speed_kmh: float, pitch_score: int, biomechanics_features: dict, ball_score: float, release_frame_url: str = None, landing_frame_url: str = None, shoulder_frame_url: str = None):
     db_analysis = PitchAnalysis(
         video_path=video_path,
         pitcher_name=pitcher_name,
         max_speed_kmh=max_speed_kmh,
         pitch_score=pitch_score,
         biomechanics_features=biomechanics_features,
-        ball_score=ball_score
+        ball_score=ball_score,
+        release_frame_url=release_frame_url,
+        landing_frame_url=landing_frame_url,
+        shoulder_frame_url=shoulder_frame_url
     )
     db.add(db_analysis)
     db.commit()

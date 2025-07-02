@@ -7,7 +7,7 @@ import logging
 
 from config import GCS_BUCKET_NAME, POSE_API_URL, BALL_API_URL
 from gcs_utils import upload_video_to_gcs
-from Drawingfunction import render_video_with_pose_and_max_ball_speed
+from Drawingfunction import render_video_with_pose_and_max_ball_speed, save_specific_frames
 from KinematicsModulev2 import extract_pitching_biomechanics
 from ClassificationModelv2 import classify_pitch_quality
 from BallClassification import classify_ball_quality
@@ -84,10 +84,43 @@ async def analyze_pitch_service(video_file, pitcher_name: str):
         raise e
 
     # 6. 運動學分析與評分
+    release_frame_url = None
+    landing_frame_url = None
+    shoulder_frame_url = None
     try:
         biomechanics_features = extract_pitching_biomechanics(pose_data)
         pitch_score = classify_pitch_quality(biomechanics_features)
         ball_score = classify_ball_quality(ball_data, ball_prediction_model)
+
+        # 儲存關鍵影格圖片
+        frame_indices = {
+            "release": biomechanics_features.get("release_frame"),
+            "landing": biomechanics_features.get("landing_frame"),
+            "shoulder": biomechanics_features.get("shoulder_frame")
+        }
+        
+        saved_frame_paths = save_specific_frames(temp_video_path, frame_indices)
+
+        # 上傳關鍵影格圖片到 GCS
+        if "release_frame_path" in saved_frame_paths:
+            release_frame_url = upload_video_to_gcs(
+                bucket_name=GCS_BUCKET_NAME,
+                source_file_path=saved_frame_paths["release_frame_path"],
+                destination_blob_name=f"key_frames/release_{os.path.basename(saved_frame_paths['release_frame_path'])}"
+            )
+        if "landing_frame_path" in saved_frame_paths:
+            landing_frame_url = upload_video_to_gcs(
+                bucket_name=GCS_BUCKET_NAME,
+                source_file_path=saved_frame_paths["landing_frame_path"],
+                destination_blob_name=f"key_frames/landing_{os.path.basename(saved_frame_paths['landing_frame_path'])}"
+            )
+        if "shoulder_frame_path" in saved_frame_paths:
+            shoulder_frame_url = upload_video_to_gcs(
+                bucket_name=GCS_BUCKET_NAME,
+                source_file_path=saved_frame_paths["shoulder_frame_path"],
+                destination_blob_name=f"key_frames/shoulder_{os.path.basename(saved_frame_paths['shoulder_frame_path'])}"
+            )
+
     except Exception as e:
         logger.error(f"分析或評分失敗: {e}", exc_info=True)
         raise e
@@ -107,5 +140,8 @@ async def analyze_pitch_service(video_file, pitcher_name: str):
         "pitch_score": pitch_score,
         "ball_score": ball_score,
         "biomechanics_features": biomechanics_features,
-        "pitcher_name": pitcher_name
+        "pitcher_name": pitcher_name,
+        "release_frame_url": release_frame_url,
+        "landing_frame_url": landing_frame_url,
+        "shoulder_frame_url": shoulder_frame_url
     }

@@ -117,3 +117,59 @@ def render_video_with_pose_and_max_ball_speed(input_video_path: str,
     cap.release()
     out.release()
     return output_video_path, max_speed_kmh
+
+def save_specific_frames(input_video_path: str, frame_indices: dict) -> dict:
+    """
+    從影片中儲存特定影格為圖片檔案。
+    Args:
+        input_video_path: 輸入影片的路徑。
+        frame_indices: 包含要儲存的影格名稱和影格編號的字典，例如
+                       {"release": 100, "landing": 50, "shoulder": 70}。
+                       如果影格編號為 None，則該影格不會被儲存。
+    Returns:
+        一個字典，包含儲存的圖片路徑，例如
+        {"release_frame_path": "path/to/release.jpg", ...}。
+    """
+    saved_image_paths = {}
+    output_dir = "temp_rendered_videos" # 使用相同的暫存目錄
+    os.makedirs(output_dir, exist_ok=True)
+
+    cap = cv2.VideoCapture(input_video_path)
+    if not cap.isOpened():
+        print(f"無法開啟影片：{input_video_path}")
+        return saved_image_paths
+
+    # 預先找出所有需要儲存的影格編號，並排序，以便一次性遍歷影片
+    frames_to_save = sorted([
+        (name, idx) for name, idx in frame_indices.items() if idx is not None
+    ], key=lambda x: x[1])
+
+    current_frame_idx = 0
+    frame_pointer = 0 # 用於追蹤 frames_to_save 的進度
+
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        if frame_pointer < len(frames_to_save):
+            name, target_frame_idx = frames_to_save[frame_pointer]
+
+            if current_frame_idx == target_frame_idx:
+                # 構建圖片儲存路徑
+                image_filename = f"{name}_{os.path.basename(input_video_path).replace('.', '_')}.jpg"
+                image_path = os.path.join(output_dir, image_filename)
+                
+                cv2.imwrite(image_path, frame)
+                saved_image_paths[f"{name}_frame_path"] = image_path
+                print(f"已儲存 {name} 影格至 {image_path}")
+                frame_pointer += 1 # 移動到下一個要儲存的影格
+
+        current_frame_idx += 1
+
+        # 如果所有目標影格都已儲存，則提前結束
+        if frame_pointer == len(frames_to_save):
+            break
+
+    cap.release()
+    return saved_image_paths

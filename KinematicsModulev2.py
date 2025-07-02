@@ -355,9 +355,13 @@ def extract_pitching_biomechanics(result):
 
     # === 落地幀 ===
     landing_frame = detect_landing_frame(pose_sequence, release_frame)
+    if landing_frame is None:
+        print("❌ 偵測不到落地幀")
 
     # === 肩膀最展開幀 ===
     shoulder_frame = detect_shoulder_frame(pose_sequence, release_frame)
+    if shoulder_frame is None:
+        print("❌ 偵測不到肩膀最展開幀")
 
     kinematic = feature2kinematic(pose_sequence, release_frame, landing_frame)
 

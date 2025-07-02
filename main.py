@@ -52,7 +52,10 @@ async def analyze_pitch(video_file: UploadFile = File(...), pitcher_name: str = 
             max_speed_kmh=analysis_result["max_speed_kmh"],
             pitch_score=analysis_result["pitch_score"],
             biomechanics_features=analysis_result["biomechanics_features"],
-            ball_score=analysis_result["ball_score"]
+            ball_score=analysis_result["ball_score"],
+            release_frame_url=analysis_result.get("release_frame_url"),
+            landing_frame_url=analysis_result.get("landing_frame_url"),
+            shoulder_frame_url=analysis_result.get("shoulder_frame_url")
         )
         logger.info(f"數據已成功保存到資料庫，ID: {new_analysis.id}")
 
@@ -65,7 +68,10 @@ async def analyze_pitch(video_file: UploadFile = File(...), pitcher_name: str = 
             "ball_score": new_analysis.ball_score,
             "biomechanics_features": new_analysis.biomechanics_features,
             "new_analysis_id": new_analysis.id,
-            "pitcher_name": new_analysis.pitcher_name
+            "pitcher_name": new_analysis.pitcher_name,
+            "release_frame_url": new_analysis.release_frame_url,
+            "landing_frame_url": new_analysis.landing_frame_url,
+            "shoulder_frame_url": new_analysis.shoulder_frame_url
         })
 
     except HTTPException as e:
@@ -87,7 +93,10 @@ async def get_history_analyses(pitcher_name: str = None, db: Session = Depends(g
                 "pitch_score": record.pitch_score,
                 "ball_score": record.ball_score,
                 "biomechanics_features": record.biomechanics_features,
-                "pitcher_name": record.pitcher_name
+                "pitcher_name": record.pitcher_name,
+                "release_frame_url": record.release_frame_url or "",
+                "landing_frame_url": record.landing_frame_url or "",
+                "shoulder_frame_url": record.shoulder_frame_url or ""
             }
             for record in history_records
         ]

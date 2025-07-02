@@ -162,26 +162,24 @@ def load_pose_from_response(result_json):
     pose_sequence = []
 
     for frame_data in result_json["frames"]:
-        # Ensure 'predictions' exists and is not empty
-        if not frame_data.get("predictions"):
+        # 確保 'predictions' 存在且不為空
+        if not frame_data.get("predictions") or not frame_data["predictions"][0]:
             continue
 
-        # The drawing logic suggests predictions might be a list of lists,
-        # where the actual person data is in the first sub-list.
-        # So, we access frame_data["predictions"][0].
-        # Then, we iterate through each 'person' in that list.
-        for person_data in frame_data["predictions"][0]: # Accessing the first list within predictions
-            keypoints = np.array(person_data["keypoints"])  # shape: (17, 2 or 3)
-            
-            # If keypoints only have 2 dimensions (x, y), add a confidence score of 1.0
-            if keypoints.shape[1] == 2:
-                conf = np.ones((17, 1), dtype=np.float32)
-                keypoints = np.concatenate([keypoints, conf], axis=-1)
+        # 找出 bbox_score 最高的候選人 (最可能是投手)
+        best_person = max(frame_data["predictions"][0], key=lambda p: p.get("bbox_score", 0))
+        
+        keypoints = np.array(best_person["keypoints"])  # shape: (17, 2 or 3)
+        
+        # If keypoints only have 2 dimensions (x, y), add a confidence score of 1.0
+        if keypoints.shape[1] == 2:
+            conf = np.ones((17, 1), dtype=np.float32)
+            keypoints = np.concatenate([keypoints, conf], axis=-1)
 
-            pose_sequence.append({
-                "frame": frame_data["frame_idx"],
-                "keypoints": keypoints
-            })
+        pose_sequence.append({
+            "frame": frame_data["frame_idx"],
+            "keypoints": keypoints
+        })
 
     return pose_sequence
 

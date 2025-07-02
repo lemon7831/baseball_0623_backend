@@ -1,11 +1,18 @@
 import os
 import asyncio
 import httpx
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, Form, Body
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import shutil
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+from pydantic import BaseModel
+
+class PitchAnalysisUpdate(BaseModel):
+    pitcher_name: Optional[str] = None
+    max_speed_kmh: Optional[float] = None
+    pitch_score: Optional[int] = None
+    ball_score: Optional[float] = None
 from fastapi.staticfiles import StaticFiles
 import logging
 import uvicorn
@@ -43,7 +50,7 @@ app.add_middleware(
 
 # 外部 API 端點
 POSE_API_URL = "https://mmpose-api-1069614647348.us-central1.run.app/pose_video"
-BALL_API_URL = "https://base-ball-detect-api-1069614647348.us-central1.run.app/predict"#2025/07/01請同學重新佈署修正誤偵測非棒球物體的錯誤
+BALL_API_URL = "https://base-ball-detect-api-1069614647348.us-east4.run.app/predict"
 
 # Render PostgreSQL 資料庫 URL
 DATABASE_URL = "postgresql://baseball_0623_postgres_user:5EcgbNjxL90WgsAWGU5xNylqYoEvNBWx@dpg-d1d1nrmmcj7s73fai6k0-a.oregon-postgres.render.com/baseball_0623_postgres"
@@ -64,6 +71,7 @@ class PitchAnalysis(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     video_path = Column(String, index=True)
+    pitcher_name = Column(String)
     max_speed_kmh = Column(Float)
     pitch_score = Column(Integer)
     biomechanics_features = Column(JSON)
@@ -76,7 +84,7 @@ Base.metadata.create_all(bind=engine)
 ball_prediction_model = joblib.load('random_forest_model.pkl')
 
 @app.post("/analyze-pitch/")
-async def analyze_pitch(video_file: UploadFile = File(...)):
+async def analyze_pitch(video_file: UploadFile = File(...), pitcher_name: str = Form(...)):
     """
     接收棒球投球影片，進行運動學分析、投球評分，並渲染結果影片，
     最後將結果儲存至資料庫並回傳給前端。
@@ -177,6 +185,7 @@ async def analyze_pitch(video_file: UploadFile = File(...)):
     try:
         new_analysis = PitchAnalysis(
             video_path=gcs_video_url,  # 儲存 GCS URL
+            pitcher_name=pitcher_name,
             max_speed_kmh=max_speed_kmh,
             pitch_score=pitch_score,
             biomechanics_features=biomechanics_features,
@@ -211,16 +220,20 @@ async def analyze_pitch(video_file: UploadFile = File(...)):
         "pitch_score": pitch_score,
         "ball_score": ball_score,
         "biomechanics_features": biomechanics_features,
-        "new_analysis_id": new_analysis_id
+        "new_analysis_id": new_analysis_id,
+        "pitcher_name": pitcher_name
     })
 
 
 
 @app.get("/history/")
-async def get_history_analyses():
+async def get_history_analyses(pitcher_name: str = None):
     db = SessionLocal()
     try:
-        history_records = db.query(PitchAnalysis).all()
+        query = db.query(PitchAnalysis)
+        if pitcher_name:
+            query = query.filter(PitchAnalysis.pitcher_name == pitcher_name)
+        history_records = query.all()
         return [
             {
                 "id": record.id,
@@ -228,13 +241,56 @@ async def get_history_analyses():
                 "max_speed_kmh": record.max_speed_kmh,
                 "pitch_score": record.pitch_score,
                 "ball_score": record.ball_score,
-                "biomechanics_features": record.biomechanics_features
+                "biomechanics_features": record.biomechanics_features,
+                "pitcher_name": record.pitcher_name
             }
             for record in history_records
         ]
     except SQLAlchemyError as e:
         logger.error(f"無法獲取歷史紀錄: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"無法獲取歷史紀錄: {e}")
+    finally:
+        db.close()
+
+
+@app.delete("/analyses/{analysis_id}")
+async def delete_analysis(analysis_id: int):
+    db = SessionLocal()
+    try:
+        analysis = db.query(PitchAnalysis).filter(PitchAnalysis.id == analysis_id).first()
+        if not analysis:
+            raise HTTPException(status_code=404, detail="分析紀錄未找到")
+        db.delete(analysis)
+        db.commit()
+        logger.info(f"分析紀錄 ID: {analysis_id} 已成功刪除")
+        return {"message": "分析紀錄已成功刪除"}
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"刪除分析紀錄失敗: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"刪除分析紀錄失敗: {e}")
+    finally:
+        db.close()
+
+@app.put("/analyses/{analysis_id}")
+async def update_analysis(analysis_id: int, updated_data: PitchAnalysisUpdate):
+    db = SessionLocal()
+    try:
+        analysis = db.query(PitchAnalysis).filter(PitchAnalysis.id == analysis_id).first()
+        if not analysis:
+            raise HTTPException(status_code=404, detail="分析紀錄未找到")
+
+        # 更新欄位
+        for field, value in updated_data.dict(exclude_unset=True).items():
+            setattr(analysis, field, value)
+        
+        db.commit()
+        db.refresh(analysis)
+        logger.info(f"分析紀錄 ID: {analysis_id} 已成功更新")
+        return analysis
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"更新分析紀錄失敗: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"更新分析紀錄失敗: {e}")
     finally:
         db.close()
 

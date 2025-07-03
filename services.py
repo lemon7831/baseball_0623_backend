@@ -131,6 +131,12 @@ async def analyze_pitch_service(video_file, pitcher_name: str):
             os.remove(temp_video_path)
         if os.path.exists(rendered_video_local_path):
             os.remove(rendered_video_local_path)
+        if os.path.exists(saved_frame_paths["release_frame_path"]):
+            os.remove(saved_frame_paths["release_frame_path"])
+        if os.path.exists(saved_frame_paths["landing_frame_path"]):
+            os.remove(saved_frame_paths["landing_frame_path"])
+        if os.path.exists(saved_frame_paths["shoulder_frame_path"]):
+            os.remove(saved_frame_paths["shoulder_frame_path"])
     except Exception as e:
         logger.warning(f"刪除暫存影片失敗: {e}", exc_info=True)
 

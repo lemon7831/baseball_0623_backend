@@ -7,7 +7,7 @@ import os
 # 為了避免循環導入和簡化，直接在這裡定義或從環境變量獲取
 # 這裡假設 DATABASE_URL 已經在 main.py 中定義，並且可以安全地複製過來
 # 或者，更好的做法是從環境變量中讀取
-DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://baseball_0623_postgres_user:5EcgbNjxL90WgsAWGU5xNylqYoEvNBWx@dpg-d1d1nrmmcj7s73fai6k0-a.oregon-postgres.render.com/baseball_0623_postgres")
+DATABASE_URL = "postgresql://postgres:baseball000@34.66.34.45:5432/postgres"
 
 def main():
     # 建立連線
@@ -34,10 +34,10 @@ def main():
             return
 
         for schema, table_name in tables:
-            print(f"\n--- 資料表: {schema}.{table_name} 的前5筆資料 ---")
+            print(f"\n--- 資料表: {schema}.{table_name} 的前100資料 ---")
             try:
                 # 用 pandas 讀取查詢結果
-                query = sql.SQL("SELECT * FROM {}.{} LIMIT 5").format(
+                query = sql.SQL("SELECT * FROM {}.{} LIMIT 100").format(
                     sql.Identifier(schema),
                     sql.Identifier(table_name)
                 )

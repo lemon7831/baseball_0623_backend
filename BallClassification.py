@@ -51,4 +51,4 @@ def classify_ball_quality(ball_json, model, target_length=239):
     # For demonstration, I'm leaving it as is, assuming your model or pipeline
     # is set up to handle potential NaNs (which Pandas will convert from None).
     
-    return float(model.predict_proba(df)[0][0])
+    return float(model.predict_proba(df.to_numpy())[0][1])

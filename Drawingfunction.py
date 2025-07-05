@@ -165,7 +165,7 @@ def render_video_with_pose_and_max_ball_speed(input_video_path: str,
 
     cap.release()
     out.release()
-    return output_video_path, max_speed_kmh
+    return output_video_path, np.round(max_speed_kmh,2)
 
 def save_specific_frames(input_video_path: str, frame_indices: dict) -> dict:
     """

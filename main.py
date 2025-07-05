@@ -1,18 +1,26 @@
-import os
-import logging
-from fastapi import FastAPI, File, UploadFile, HTTPException, Form, Depends
-from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
-import uvicorn
-from config import GCS_BUCKET_NAME
-from database import get_db, PitchAnalysis
-from models import PitchAnalysisUpdate
-from crud import get_pitch_analysis, get_pitch_analyses, create_pitch_analysis, update_pitch_analysis, delete_pitch_analysis
-from services import analyze_pitch_service
+# 檔案: mainV2.py
+# 職責: 作為 API 的入口點，接收請求並完全轉交給服務層處理。
 
-# 設定 logging
+import logging
+from typing import Optional, List
+
+from fastapi import FastAPI, File, UploadFile, HTTPException, Form, Depends, Query, Body
+from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
+from pydantic import BaseModel
+import uvicorn
+
+# --- 從我們的「資料庫中心」和「服務中心」匯入 ---
+# 已更新為您最新的駝峰式檔名
+import crud
+import services
+from database import get_db, PitchAnalyses
+from models import PitchAnalysisUpdate
+
+# --- 全域設定 ---
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
@@ -20,10 +28,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# FastAPI 應用實例
 app = FastAPI()
 
-# CORS 設置，允許所有來源、方法、標頭，以處理跨域問題
+# CORS 設置
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -32,59 +39,44 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# --- API 路由 ---
+
 @app.post("/analyze-pitch/")
-async def analyze_pitch(video_file: UploadFile = File(...), pitcher_name: str = Form(...), db: Session = Depends(get_db)):
+async def analyze_pitch(
+    db: Session = Depends(get_db),
+    video_file: UploadFile = File(...), 
+    player_name: str = Form(...),
+    benchmark_player_name: Optional[str] = Form(None) 
+):
     """
-    接收棒球投球影片，進行運動學分析、投球評分，並渲染結果影片，
-    最後將結果儲存至資料庫並回傳給前端。
+    接收前端請求，將所有工作轉交給服務層，並直接回傳服務層的結果。
     """
     if not video_file.filename:
         raise HTTPException(status_code=400, detail="未上傳影片檔案")
 
     try:
-        analysis_result = await analyze_pitch_service(video_file, pitcher_name)
-
-        # 儲存至資料庫
-        new_analysis = create_pitch_analysis(
+        
+        analysis_result = await services.analyze_pitch_service(
             db=db,
-            video_path=analysis_result["output_video_url"],
-            pitcher_name=analysis_result["pitcher_name"],
-            max_speed_kmh=analysis_result["max_speed_kmh"],
-            pitch_score=analysis_result["pitch_score"],
-            biomechanics_features=analysis_result["biomechanics_features"],
-            ball_score=analysis_result["ball_score"],
-            release_frame_url=analysis_result.get("release_frame_url"),
-            landing_frame_url=analysis_result.get("landing_frame_url"),
-            shoulder_frame_url=analysis_result.get("shoulder_frame_url")
+            video_file=video_file,
+            player_name=player_name,
+            benchmark_player_name=benchmark_player_name
         )
-        logger.info(f"數據已成功保存到資料庫，ID: {new_analysis.id}")
-
-        # 回傳結果
-        return JSONResponse(content={
-            "message": "影片分析成功",
-            "output_video_url": new_analysis.video_path,
-            "max_speed_kmh": round(new_analysis.max_speed_kmh, 2),
-            "pitch_score": new_analysis.pitch_score,
-            "ball_score": new_analysis.ball_score,
-            "biomechanics_features": new_analysis.biomechanics_features,
-            "new_analysis_id": new_analysis.id,
-            "pitcher_name": new_analysis.pitcher_name,
-            "release_frame_url": new_analysis.release_frame_url,
-            "landing_frame_url": new_analysis.landing_frame_url,
-            "shoulder_frame_url": new_analysis.shoulder_frame_url
-        })
+        
+        return JSONResponse(content=analysis_result)
 
     except HTTPException as e:
         raise e
     except Exception as e:
         logger.error(f"影片分析處理失敗: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"影片分析處理失敗: {e}")
+        raise HTTPException(status_code=500, detail=f"影片分析處理失敗: {str(e)}")
 
 
 @app.get("/history/")
 async def get_history_analyses(pitcher_name: str = None, db: Session = Depends(get_db)):
+    # (此路由保留您同事的設計，不變)
     try:
-        history_records = get_pitch_analyses(db, pitcher_name)
+        history_records = crud.get_pitch_analyses(db, pitcher_name)
         return [
             {
                 "id": record.id,
@@ -107,28 +99,29 @@ async def get_history_analyses(pitcher_name: str = None, db: Session = Depends(g
 
 @app.delete("/analyses/{analysis_id}")
 async def delete_analysis(analysis_id: int, db: Session = Depends(get_db)):
-    try:
-        if not delete_pitch_analysis(db, analysis_id):
-            raise HTTPException(status_code=404, detail="分析紀錄未找到")
-        logger.info(f"分析紀錄 ID: {analysis_id} 已成功刪除")
-        return {"message": "分析紀錄已成功刪除"}
-    except SQLAlchemyError as e:
-        logger.error(f"刪除分析紀錄失敗: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"刪除分析紀錄失敗: {e}")
+     try:
+         if not crud.delete_pitch_analysis(db, analysis_id):
+             raise HTTPException(status_code=404, detail="分析紀錄未找到")
+         logger.info(f"分析紀錄 ID: {analysis_id} 已成功刪除")
+         return {"message": "分析紀錄已成功刪除"}
+     except SQLAlchemyError as e:
+         logger.error(f"刪除分析紀錄失敗: {e}", exc_info=True)
+         raise HTTPException(status_code=500, detail=f"刪除分析紀錄失敗: {e}")
 
 @app.put("/analyses/{analysis_id}")
 async def update_analysis(analysis_id: int, updated_data: PitchAnalysisUpdate, db: Session = Depends(get_db)):
-    try:
-        analysis = update_pitch_analysis(db, analysis_id, updated_data)
-        if not analysis:
-            raise HTTPException(status_code=404, detail="分析紀錄未找到")
-        logger.info(f"分析紀錄 ID: {analysis_id} 已成功更新")
-        return analysis
-    except SQLAlchemyError as e:
-        logger.error(f"更新分析紀錄失敗: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"更新分析紀錄失敗: {e}")
+     try:
+         analysis = crud.update_pitch_analysis(db, analysis_id, updated_data)
+         if not analysis:
+             raise HTTPException(status_code=404, detail="分析紀錄未找到")
+         logger.info(f"分析紀錄 ID: {analysis_id} 已成功更新")
+         return analysis
+     except SQLAlchemyError as e:
+         logger.error(f"更新分析紀錄失敗: {e}", exc_info=True)
+         raise HTTPException(status_code=500, detail=f"更新分析紀錄失敗: {e}")
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))
+    import os
+    port = int(os.environ.get("PORT", 8080)) # 建議使用一個新的埠號
     uvicorn.run("main:app", host="0.0.0.0", port=port)

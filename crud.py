@@ -27,14 +27,12 @@ def create_pitch_analysis(db: Session, analysis_data: Dict[str, Any]) -> PitchAn
     根據傳入的字典，建立一筆新的分析紀錄。
     這個版本更靈活，可以直接接收來自 services 層的字典。
     """
-    # 為了對應資料庫模型，我們需要從 scores 字典中提取出 pitch_score 和 ball_score
-    scores = analysis_data.get("scores", {})
     db_analysis = PitchAnalyses(
-        video_path=analysis_data.get("video_path"),
+        video_path=analysis_data.get("output_video_url"),
         pitcher_name=analysis_data.get("pitcher_name"),
         max_speed_kmh=analysis_data.get("max_speed_kmh"),
-        pitch_score=scores.get("pitch_mechanics_score"),
-        ball_score=scores.get("ball_flight_score"),
+        pitch_score=analysis_data.get('pitch_score'),
+        ball_score=analysis_data.get('ball_score'),
         biomechanics_features=analysis_data.get("biomechanics_features"),
         release_frame_url=analysis_data.get("release_frame_url"),
         landing_frame_url=analysis_data.get("landing_frame_url"),

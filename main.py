@@ -15,6 +15,7 @@ import uvicorn
 
 # --- 從我們的「資料庫中心」和「服務中心」匯入 ---
 # 已更新為您最新的駝峰式檔名
+from crud import create_pitch_analysis
 import crud
 import services
 from database import get_db, PitchAnalyses
@@ -55,14 +56,20 @@ async def analyze_pitch(
         raise HTTPException(status_code=400, detail="未上傳影片檔案")
 
     try:
-        
+        # 嘗試取得分析結果
         analysis_result = await services.analyze_pitch_service(
             db=db,
             video_file=video_file,
             player_name=player_name,
             benchmark_player_name=benchmark_player_name
         )
-        
+        # 儲存至資料庫
+        new_analysis = create_pitch_analysis(
+            db=db,
+            analysis_data=analysis_result,
+        )
+        logger.info(f"數據已成功保存到資料庫，ID: {new_analysis.id}")
+        # 返回資料給前端
         return JSONResponse(content=analysis_result)
 
     except HTTPException as e:

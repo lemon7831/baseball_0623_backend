@@ -2,10 +2,10 @@
 import os
 import json
 import numpy as np
-
+import cv2
 # landing.py
 """
-Detect the landing frame from a pose sequence. Optional: show result on video frame.
+落地那一幀
 """
 def detect_landing_frame(pose_sequence, release_frame, back_offset=9):
     """
@@ -31,9 +31,8 @@ def detect_landing_frame(pose_sequence, release_frame, back_offset=9):
 
 # release.py
 """
-Detect the release frame from a pose sequence. Optional: show result on video frame.
+出手那一幀
 """
-import numpy as np
 def detect_release_frame(pose_sequence):
     candidate_frames = []
 
@@ -82,13 +81,9 @@ def detect_release_frame(pose_sequence):
 
 # shoulder.py
 """
-Detect the most open shoulder frame from a pose sequence.
-Optional: show result on video frame.
+肩膀最大那一幀
 """
-import os
-import json
-import numpy as np
-def detect_shoulder_frame(pose_sequence, release_frame, back_window=30):
+def detect_shoulder_frame(pose_sequence, release_frame):
     """
     偵測肩膀最開啟的幀：
     - 起始：右手腕高於右肩（代表投球已啟動）
@@ -146,92 +141,9 @@ def detect_shoulder_frame(pose_sequence, release_frame, back_window=30):
 
     return shoulder_frame
 
-# utils.py
 """
-通用函式：讀取 pose_sequence、計算角度等
+取特徵
 """
-import os
-import json
-import numpy as np
-def load_pose_from_response(result_json):
-    """
-    從 FastAPI 回傳的 JSON 解析出 pose_sequence 格式
-    - result_json: API 回傳的 dict
-    - 回傳: list[{"frame": int, "keypoints": np.ndarray(17, 3)}]
-    """
-    pose_sequence = []
-
-    for frame_data in result_json["frames"]:
-        # 確保 'predictions' 存在且不為空
-        if not frame_data.get("predictions") or not frame_data["predictions"][0]:
-            continue
-
-        # 找出 bbox_score 最高的候選人 (最可能是投手)
-        best_person = max(frame_data["predictions"][0], key=lambda p: p.get("bbox_score", 0))
-        
-        keypoints = np.array(best_person["keypoints"])  # shape: (17, 2 or 3)
-        
-        # If keypoints only have 2 dimensions (x, y), add a confidence score of 1.0
-        if keypoints.shape[1] == 2:
-            conf = np.ones((17, 1), dtype=np.float32)
-            keypoints = np.concatenate([keypoints, conf], axis=-1)
-
-        pose_sequence.append({
-            "frame": frame_data["frame_idx"],
-            "keypoints": keypoints
-        })
-
-    return pose_sequence
-
-def get_keypoints_at(pose_sequence, frame_id):
-    """
-    根據幀編號 frame_id 回傳該幀的 keypoints。
-    - pose_sequence: list of dict，格式為 [{"frame": int, "keypoints": np.ndarray(17, 3)}]
-    - frame_id: int，欲查找的幀號
-
-    回傳：該幀的 keypoints，或 None 若找不到。
-    """
-    for item in pose_sequence:
-        if item["frame"] == frame_id:
-            return item["keypoints"]
-    return None
-
-
-
-def calculate_pixel_angle(a, b, c):
-    """
-    計算以點 b 為中心，夾在向量 ab 和 cb 之間的夾角（像素座標）
-    - a, b, c: np.array([x, y])
-    - 回傳: angle in degrees
-    """
-    ab = a - b
-    cb = c - b
-
-    norm_ab = np.linalg.norm(ab)
-    norm_cb = np.linalg.norm(cb)
-    if norm_ab == 0 or norm_cb == 0:
-        return None
-
-    cosine_angle = np.dot(ab, cb) / (norm_ab * norm_cb)
-    angle = np.degrees(np.arccos(np.clip(cosine_angle, -1.0, 1.0)))
-    return angle
-
-
-def calculate_pixel_angle_from_points(a, b, c):
-    """
-    舊版本相容函式，輸入為 list 或 tuple（自動轉 np.array）
-    """
-    return calculate_pixel_angle(np.array(a), np.array(b), np.array(c))
-
-
-def save_json(data, path):
-    """
-    儲存資料為 JSON 格式。
-    """
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2)
-
-
 COCO_KEYPOINTS = {
     "nose": 0,
     "left_eye": 1,
@@ -253,7 +165,6 @@ COCO_KEYPOINTS = {
 }
 
 
-import numpy as np
 def feature2kinematic(pose_sequence, release_frame, landing_frame, shoulder_frame=None):
     """
     從姿勢序列與關鍵幀中提取基本 2D 力學特徵
@@ -355,13 +266,9 @@ def extract_pitching_biomechanics(result):
 
     # === 落地幀 ===
     landing_frame = detect_landing_frame(pose_sequence, release_frame)
-    if landing_frame is None:
-        print("❌ 偵測不到落地幀")
 
     # === 肩膀最展開幀 ===
     shoulder_frame = detect_shoulder_frame(pose_sequence, release_frame)
-    if shoulder_frame is None:
-        print("❌ 偵測不到肩膀最展開幀")
 
     kinematic = feature2kinematic(pose_sequence, release_frame, landing_frame)
 
@@ -377,3 +284,74 @@ def extract_pitching_biomechanics(result):
     "Trunk_flexion_at_BR": kinematic.get("Trunk_flexion_at_BR"),
     "Trunk_lateral_flexion_at_HS": kinematic.get("Trunk_lateral_flexion_at_HS"),
 }
+
+
+# utils.py
+"""
+通用函式：讀取 pose_sequence、計算角度等
+"""
+def load_pose_from_response(result_json):
+    """
+    從 FastAPI 回傳的 JSON 解析出 pose_sequence 格式
+    - result_json: API 回傳的 dict
+    - 回傳: list[{"frame": int, "keypoints": np.ndarray(17, 3)}]
+    """
+    pose_sequence = []
+
+    for frame in result_json["frames"]:
+        if not frame["predictions"]:
+            continue
+
+        keypoints = np.array(frame["predictions"][0]["keypoints"])  # shape: (17, 2 or 3)
+
+        if keypoints.shape[1] == 2:
+            conf = np.ones((17, 1), dtype=np.float32)
+            keypoints = np.concatenate([keypoints, conf], axis=-1)
+
+        pose_sequence.append({
+            "frame": frame["frame_idx"],
+            "keypoints": keypoints
+        })
+
+    return pose_sequence
+
+
+def get_keypoints_at(pose_sequence, frame_id):
+    """
+    根據幀編號 frame_id 回傳該幀的 keypoints。
+    - pose_sequence: list of dict，格式為 [{"frame": int, "keypoints": np.ndarray(17, 3)}]
+    - frame_id: int，欲查找的幀號
+
+    回傳：該幀的 keypoints，或 None 若找不到。
+    """
+    for item in pose_sequence:
+        if item["frame"] == frame_id:
+            return item["keypoints"]
+    return None
+
+
+def calculate_pixel_angle(a, b, c):
+    """
+    計算以點 b 為中心，夾在向量 ab 和 cb 之間的夾角（像素座標）
+    - a, b, c: np.array([x, y])
+    - 回傳: angle in degrees
+    """
+    ab = a - b
+    cb = c - b
+
+    norm_ab = np.linalg.norm(ab)
+    norm_cb = np.linalg.norm(cb)
+    if norm_ab == 0 or norm_cb == 0:
+        return None
+
+    cosine_angle = np.dot(ab, cb) / (norm_ab * norm_cb)
+    angle = np.degrees(np.arccos(np.clip(cosine_angle, -1.0, 1.0)))
+    return angle
+
+
+def calculate_pixel_angle_from_points(a, b, c):
+    """
+    舊版本相容函式，輸入為 list 或 tuple（自動轉 np.array）
+    """
+    return calculate_pixel_angle(np.array(a), np.array(b), np.array(c))
+

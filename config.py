@@ -4,7 +4,7 @@ import os
 GCS_BUCKET_NAME = "baseball_cloud_storage"
 
 # 外部 API 端點
-POSE_API_URL = "https://mmpose-api-1069614647348.us-central1.run.app/pose_video"
+POSE_API_URL = "https://mmpose-api-new-1069614647348.us-central1.run.app/pose_video"#改成只有偵測投手的骨架
 BALL_API_URL = "https://base-ball-detect-api-1069614647348.us-east4.run.app/predict"
 
 # Render PostgreSQL 資料庫 URL

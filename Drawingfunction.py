@@ -1,18 +1,84 @@
 import cv2
 import os
 import math
+import numpy as np
 from typing import Tuple # 導入 Tuple 以正確標註回傳型別
 
-# COCO 骨架連線對
-COCO_CONNECTIONS = [
-    (0, 1), (0, 2), (1, 3), (2, 4),      # 頭臉
-    (5, 6),                             # 肩膀
-    (5, 7), (7, 9),                     # 左手臂
-    (6, 8), (8, 10),                    # 右手臂
-    (5, 11), (6, 12), (11, 12),         # 軀幹臀部
-    (11, 13), (13, 15),                 # 左腿
-    (12, 14), (14, 16)                  # 右腿
+"""
+畫投手骨架的函數
+"""
+# COCO 17 個關節點的骨架連接規則
+SKELETON_CONNECTIONS = [
+    [15, 13], [13, 11], [16, 14], [14, 12], [11, 12], [5, 11], [6, 12],
+    [5, 6], [5, 7], [6, 8], [7, 9], [8, 10], [1, 2], [0, 1], [0, 2],
+    [1, 3], [2, 4]
 ]
+
+# 為不同骨架部分定義顏色 (BGR 格式)
+LIMB_COLORS = [
+    (51, 153, 255), (51, 153, 255), (51, 153, 255), (51, 153, 255), (255, 128, 0),
+    (255, 128, 0), (255, 128, 0), (255, 128, 0), (0, 255, 0), (0, 255, 0),
+    (0, 255, 0), (0, 255, 0), (255, 0, 255), (255, 0, 255), (255, 0, 255),
+    (255, 0, 255), (255, 0, 255)
+]
+
+KEYPOINT_COLOR = (0, 0, 255) # 關節點顏色
+BBOX_COLOR = (0, 255, 0) # Bounding Box 顏色
+
+def draw_pitcher_on_frame(image, pitcher_data, kpt_thr=0.3, line_thickness=1, point_radius=3):
+    """
+    在一幀影像上繪製一個投手的骨架和邊界框。
+    """
+    if not pitcher_data:
+        return image
+
+    bbox_data = pitcher_data.get('bbox')
+    keypoints_data = pitcher_data.get('keypoints')
+    keypoint_scores_data = pitcher_data.get('keypoint_scores')
+
+
+    # API 回傳的 bbox 數據可能有多層列表包裝，例如 [[x1, y1, x2, y2]]。
+    # 下面的 while 迴圈會解開這層包裝，確保我們拿到的是 [x1, y1, x2, y2] 這種可以直接使用的格式。
+    # 如果這個解包邏輯不夠完善，或 bbox 數據本身有問題，繪製就會被跳過。
+    while isinstance(bbox_data, list) and len(bbox_data) > 0 and isinstance(bbox_data[0], list):
+        bbox_data = bbox_data[0]
+    
+    bbox = bbox_data
+    
+    # 繪製邊界框 (Bounding Box)
+    if bbox and len(bbox) == 4 and all(isinstance(c, (int, float)) for c in bbox):
+        x1, y1, x2, y2 = [int(coord) for coord in bbox]
+        cv2.rectangle(image, (x1, y1), (x2, y2), BBOX_COLOR, line_thickness)
+
+    # 檢查數據是否存在且非空
+    if not keypoints_data or not keypoint_scores_data:
+        return image
+
+    keypoints = np.array(keypoints_data)
+    keypoint_scores = np.array(keypoint_scores_data)
+    
+    # 檢查數據維度是否正確
+    if keypoints.ndim != 2 or keypoints.shape[1] != 2 or keypoint_scores.ndim != 1:
+        print(f"⚠️ 數據格式不正確，無法繪製骨架。Keypoints shape: {keypoints.shape}, Scores shape: {keypoint_scores.shape}")
+        return image
+
+    # 繪製骨架連接線
+    for i, (p1_idx, p2_idx) in enumerate(SKELETON_CONNECTIONS):
+        if p1_idx < len(keypoint_scores) and p2_idx < len(keypoint_scores):
+            if keypoint_scores[p1_idx] > kpt_thr and keypoint_scores[p2_idx] > kpt_thr:
+                pt1 = (int(keypoints[p1_idx][0]), int(keypoints[p1_idx][1]))
+                pt2 = (int(keypoints[p2_idx][0]), int(keypoints[p2_idx][1]))
+                # 線條的粗細由 line_thickness 參數控制
+                cv2.line(image, pt1, pt2, LIMB_COLORS[i], line_thickness)
+
+    # 繪製關節點
+    for i, kpt in enumerate(keypoints):
+        if i < len(keypoint_scores) and keypoint_scores[i] > kpt_thr:
+            x, y = int(kpt[0]), int(kpt[1])
+            # 點的大小 (半徑) 由 point_radius 參數控制
+            cv2.circle(image, (x, y), point_radius, KEYPOINT_COLOR, -1)
+
+    return image
 
 def render_video_with_pose_and_max_ball_speed(input_video_path: str,
                                               pose_json: dict,
@@ -51,31 +117,14 @@ def render_video_with_pose_and_max_ball_speed(input_video_path: str,
         ret, frame = cap.read()
         if not ret:
             break
-
+        
         # --- 畫骨架 ---
-        predictions_raw = pose_frames.get(frame_idx, [])
-        # 根據 pose_json 的實際結構調整這裡的取值邏輯
-        # 如果 predictions_raw 是一個包含列表的列表，取第一個列表
-        # 否則直接使用 predictions_raw
-        predictions = predictions_raw[0] if predictions_raw and isinstance(predictions_raw, list) and predictions_raw and isinstance(predictions_raw[0], list) else predictions_raw
-
-
-        for person in predictions:
-            keypoints = person.get('keypoints', [])
-            scores = person.get('keypoint_scores', [])
-            if not keypoints or not scores:
-                continue
-
-            for i, (x, y) in enumerate(keypoints):
-                if i < len(scores) and scores[i] > 0.3:
-                    cv2.circle(frame, (int(x), int(y)), 4, (0, 255, 0), -1)
-
-            for (start, end) in COCO_CONNECTIONS:
-                if start < len(keypoints) and end < len(keypoints):
-                    x1, y1 = keypoints[start]
-                    x2, y2 = keypoints[end]
-                    if scores[start] > 0.3 and scores[end] > 0.3:
-                        cv2.line(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 255), 2)
+        # 整合進來的繪圖邏輯
+        pose_predictions_for_frame = pose_frames.get(frame_idx, [])
+        if pose_predictions_for_frame:
+            pitcher_data = pose_predictions_for_frame[0]
+            # 直接呼叫本檔案內的繪圖函式
+            draw_pitcher_on_frame(frame, pitcher_data)
 
         # --- 畫棒球 + 計算速度 ---
         if frame_idx in ball_frames:
